@@ -66,8 +66,8 @@ The same steps for `test2` :
 
 ```assembly
 00400308 <bitCount>:
-	...
-	400350:	28 00 00 00 	lw $2,32($30)
+  ...
+  400350:	28 00 00 00 	lw $2,32($30)
   400354:	20 00 02 1e 
   400358:	62 00 00 00 	0x00000062:02030001
   40035c:	01 00 03 02 
@@ -88,10 +88,10 @@ Because the format of `addOK` is the same as `add` , the format of `bitCount` is
 For `addOK` , we are offered macro `OVER(X,Y)` to check whether the sum of two operands is overflowed.
 
 ```c
-#define ADDOK_IMPL										\
-	{											\
-  	SET_GPR(RD, !OVER(GPR(RS), GPR(RT));							\
-	}
+#define ADDOK_IMPL									\
+  {											\
+    SET_GPR(RD, !OVER(GPR(RS), GPR(RT));						\
+  }
 DEFINST(ADDOK, 0x61,
         "addOK", "d,s,t",
         IntALU, F_ICOMP,
@@ -101,25 +101,25 @@ DEFINST(ADDOK, 0x61,
 For `bitCount` , we can use bitwise operation :
 
 ```c
-#define BITCOUNT_IMPL										\
-	{											\
-    int mask1_tmp = (0x55 << 8) | 0x55;								\
-		int mask1 = (mask1_tmp << 16) | mask1_tmp;					\
-		int mask2_tmp = (0x33 << 8) | 0x33;						\
-		int mask2 = (mask2_tmp << 16) | mask2_tmp;					\
-		int mask3_tmp = (0x0f << 8) | 0x0f;						\
-		int mask3 = (mask3_tmp << 16) | mask3_tmp;					\
-		int mask4 = (0xff << 16) | 0xff;						\
-		int mask5 = (0xff << 8) | 0xff;							\
-		int c = GPR(RS);								\
-		c=(c & mask1) + ((c >> 1) & mask1);						\
-		c=(c & mask2) + ((c >> 2) & mask2);						\
-		c=(c & mask3) + ((c >> 4) & mask3);						\
-		c=(c & mask4) + ((c >> 8) & mask4);						\
-		c=(c & mask5) + ((c >> 16) & mask5);						\
-		if (UIMM) SET_GPR(RT, c);							\
-    		else SET_GPR(RT, 32-c);								\
-	}
+#define BITCOUNT_IMPL									\
+  {											\
+    int mask1_tmp = (0x55 << 8) | 0x55;							\
+    int mask1 = (mask1_tmp << 16) | mask1_tmp;						\
+    int mask2_tmp = (0x33 << 8) | 0x33;							\
+    int mask2 = (mask2_tmp << 16) | mask2_tmp;						\
+    int mask3_tmp = (0x0f << 8) | 0x0f;							\
+    int mask3 = (mask3_tmp << 16) | mask3_tmp;						\
+    int mask4 = (0xff << 16) | 0xff;							\
+    int mask5 = (0xff << 8) | 0xff;							\
+    int c = GPR(RS);									\
+    c=(c & mask1) + ((c >> 1) & mask1);							\
+    c=(c & mask2) + ((c >> 2) & mask2);							\
+    c=(c & mask3) + ((c >> 4) & mask3);							\
+    c=(c & mask4) + ((c >> 8) & mask4);							\
+    c=(c & mask5) + ((c >> 16) & mask5);						\
+    if (UIMM) SET_GPR(RT, c);								\
+    else SET_GPR(RT, 32-c);								\
+  }
 DEFINST(BITCOUNT, 0x62,
        "bitCount", "t,s,u",
        IntALU, F_ICOMP|F_IMM,
