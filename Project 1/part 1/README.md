@@ -101,24 +101,24 @@ DEFINST(ADDOK, 0x61,
 For `bitCount` , we can use bitwise operation :
 
 ```c
-#define BITCOUNT_IMPL																	\
-	{																										\
+#define BITCOUNT_IMPL										\
+	{											\
     int mask1_tmp = (0x55 << 8) | 0x55;								\
-		int mask1 = (mask1_tmp << 16) | mask1_tmp;				\
-		int mask2_tmp = (0x33 << 8) | 0x33;								\
-		int mask2 = (mask2_tmp << 16) | mask2_tmp;				\
-		int mask3_tmp = (0x0f << 8) | 0x0f;								\
-		int mask3 = (mask3_tmp << 16) | mask3_tmp;				\
-		int mask4 = (0xff << 16) | 0xff;									\
-		int mask5 = (0xff << 8) | 0xff;										\
-		int c = GPR(RS);																	\
-		c=(c & mask1) + ((c >> 1) & mask1);								\
-		c=(c & mask2) + ((c >> 2) & mask2);								\
-		c=(c & mask3) + ((c >> 4) & mask3);								\
-		c=(c & mask4) + ((c >> 8) & mask4);								\
-		c=(c & mask5) + ((c >> 16) & mask5);							\
-		if (UIMM) SET_GPR(RT, c);													\
-    else SET_GPR(RT, 32-c);														\
+		int mask1 = (mask1_tmp << 16) | mask1_tmp;					\
+		int mask2_tmp = (0x33 << 8) | 0x33;						\
+		int mask2 = (mask2_tmp << 16) | mask2_tmp;					\
+		int mask3_tmp = (0x0f << 8) | 0x0f;						\
+		int mask3 = (mask3_tmp << 16) | mask3_tmp;					\
+		int mask4 = (0xff << 16) | 0xff;						\
+		int mask5 = (0xff << 8) | 0xff;							\
+		int c = GPR(RS);								\
+		c=(c & mask1) + ((c >> 1) & mask1);						\
+		c=(c & mask2) + ((c >> 2) & mask2);						\
+		c=(c & mask3) + ((c >> 4) & mask3);						\
+		c=(c & mask4) + ((c >> 8) & mask4);						\
+		c=(c & mask5) + ((c >> 16) & mask5);						\
+		if (UIMM) SET_GPR(RT, c);							\
+    		else SET_GPR(RT, 32-c);								\
 	}
 DEFINST(BITCOUNT, 0x62,
        "bitCount", "t,s,u",
