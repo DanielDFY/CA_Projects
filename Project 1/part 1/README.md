@@ -88,8 +88,8 @@ Because the format of `addOK` is the same as `add` , the format of `bitCount` is
 For `addOK` , we are offered macro `OVER(X,Y)` to check whether the sum of two operands is overflowed.
 
 ```c
-#define ADDOK_IMPL																		\
-	{																										\
+#define ADDOK_IMPL										\
+	{											\
   	SET_GPR(RD, !OVER(GPR(RS), GPR(RT));							\
 	}
 DEFINST(ADDOK, 0x61,
