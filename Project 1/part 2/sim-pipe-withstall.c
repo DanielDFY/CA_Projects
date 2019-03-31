@@ -112,7 +112,8 @@ sim_init(void)
   de.busA = DNA;
   de.busB = DNA;
   de.wr = 0;
-  de.dst = DNA;
+  de.dstR = DNA;
+  de.dstM = DNA;
   de.rwflag = 0;
   de.target = 0;
   /* EX/MEM */
@@ -120,23 +121,24 @@ sim_init(void)
   em.PC = 0;
   em.alu = 0;
   em.wr = 0;
-  em.dst = DNA;
+  em.dstR = DNA;
+  em.dstM = DNA;
   em.rwflag = 0;
   em.target = 0;
   /* MEM/WB */
   mw.inst.a = NOP;
   mw.PC = 0;
   mw.memLoad = 0;
-  mw.dst = DNA;
-  mw.fromMem = 0;
+  mw.dstR = DNA;
+  mw.dstM = DNA;
   /* WB */
   wb.inst.a = NOP;
   wb.PC = 0;
   /* CTL */
-  ctl.flag = FALSE;
+  ctl.flag = 0;
   ctl.cond = 0;
   ctl.dst = 0;
-  ctl.stall = FALSE;
+  ctl.stall = 0;
 }
 
 /* load program into simulated state */
@@ -256,11 +258,11 @@ sim_main(void)
   {
     ++sim_num_insn;
 	  do_pipeline_ctl();
-    do_if();
-    do_id();
-    do_ex();
-    do_mem();
     do_wb();
+    do_mem();
+    do_ex();
+    do_id();
+    do_if();
     /* print current trace */
     do_log();
   }
@@ -299,17 +301,19 @@ void do_if()
     fd.NPC = fd.PC + sizeof(md_inst_t);
   }
   /* instruction fetch */
-  MD_FETCH_INSTI(fd.inst, mem, fd.PC);
   fd.PC = fd.NPC;
+  MD_FETCH_INSTI(fd.inst, mem, fd.PC);
 }
 
 void do_id()
 {
   /* if inst is nop, simply return */
-  if(NOP == fd.inst.a) return;
-  de.PC = fd.PC;
   de.inst = fd.inst;
+  de.PC = fd.PC;
+  de.target = 0;
+  if(NOP == de.inst.a) return;
   MD_SET_OPCODE(de.opcode, de.inst);
+  md_inst_t inst = de.inst;
 #define DEFINST(OP,MSK,NAME,OPFORM,RES,FLAGS,O1,O2,I1,I2,I3)\
   if (OP==de.opcode){\
     de.iflags = FLAGS;\
@@ -325,7 +329,7 @@ void do_id()
 #include "machine.def"
 READ_OPRAND_VALUE:
   /* check for stall */    
-  if((de.oprand.in1 >= 0 && (ctl.dst & de.oprand.in1)) || (de.oprand.in2 >= 0 && (ctl.dst & de.oprand.in2))) {
+  if((de.oprand.in1 >= 0 && (ctl.dst & 1 << de.oprand.in1)) || (de.oprand.in2 >= 0 && (ctl.dst & 1 << de.oprand.in2))) {
     ctl.stall = TRUE;
     return;
   } else {
@@ -351,7 +355,7 @@ READ_OPRAND_VALUE:
         break;
       case JUMP:
         ctl.flag = TRUE;
-        ctl.cond = 1;
+        ctl.cond |= 1;
         de.target = (fd.PC & 0xf0000000) | ((de.inst.b & 0x3ffffff) << 2);
         break;
       case BNE:
@@ -375,24 +379,28 @@ READ_OPRAND_VALUE:
   } else if (de.func == ALU_SLL) {
     de.busB = de.inst.b & 0xff;
   } else {
-    de.busB = de.oprand.in2 != DNA?GPR(de.oprand.in2):0; 
+    de.busB = de.oprand.in2 != DNA ? GPR(de.oprand.in2):0; 
   }
-  /* record write-in register, set write flag */
+  /* record write-in register if F_STORE, set write flag */
   if (de.iflags & F_STORE) {
     de.wr = GPR(de.oprand.in1);
-    de.rwflag |= 1;
-  } else {
-    de.rwflag &= ~1;
-  }
-  /* set read flag */
-  if (de.iflags & F_LOAD) {
     de.rwflag |= 2;
   } else {
     de.rwflag &= ~2;
   }
   /* record dst */
   if (de.oprand.out1 >= 0) {
-    ctl.dst ^= de.oprand.out1;
+    ctl.dst ^= 1 << de.oprand.out1;
+  }
+  /* set read flag */
+  if (de.iflags & F_LOAD) {
+    de.dstM = de.oprand.out1;
+    de.dstR = DNA;
+    de.rwflag |= 4;
+  } else {
+    de.dstR = de.oprand.out1;
+    de.dstM = DNA;
+    de.rwflag &= ~4;
   }
 }
 
@@ -400,7 +408,9 @@ void do_ex()
 {
   em.inst = de.inst;
   em.PC = de.PC;
-  em.dst = de.dst;
+  em.wr = de.wr;
+  em.dstR = de.dstR;
+  em.dstM = de.dstM;
   em.rwflag = de.rwflag;
   em.target = de.target;
   switch (de.func) {
@@ -425,9 +435,9 @@ void do_ex()
   }
   if (ctl.flag) {
     if (em.alu) {
-      ctl.cond = 2;
+      ctl.cond |= 2;
     } else {
-      ctl.cond = 0;
+      ctl.flag = FALSE;
     }
   }
 }
@@ -437,14 +447,13 @@ void do_mem()
   enum md_fault_type _fault;
   mw.inst = em.inst;
   mw.PC = em.PC;
-  if (em.rwflag & 1) {
-    WRITE_WORD(em.wr, em.alu, _fault);
-  } else if (em.rwflag & 2) {
-    mw.memLoad = READ_WORD(em.alu, _fault);
-    mw.fromMem = TRUE;
-  }
-  if(wb.inst.a == SYSCALL){
-    SYSCALL(wb.inst);
+  mw.alu = em.alu;
+  mw.dstR = em.dstR;
+  mw.dstM = em.dstM;
+  if (em.rwflag & 2) {
+    WRITE_WORD(em.wr, mw.alu, _fault);
+  } else if (em.rwflag & 4) {
+    mw.memLoad = READ_WORD(mw.alu, _fault);
   }
 }                                                                                        
 
@@ -452,9 +461,16 @@ void do_wb()
 {
 	wb.inst = mw.inst;
   wb.PC = mw.PC;
-  ctl.dst ^= mw.wr;
-  if (mw.fromMem) {
-    SET_GPR(mw.wr, mw.memLoad);
+  if (mw.dstR != DNA) {
+    ctl.dst ^= 1 << mw.dstR;
+    SET_GPR(mw.dstR, mw.alu);
+  }
+  if (mw.dstM != DNA) {
+    ctl.dst ^= 1 << mw.dstM;
+    SET_GPR(mw.dstM, mw.memLoad);
+  }
+  if(wb.inst.a == SYSCALL){
+    SYSCALL(wb.inst);
   }
 }
 

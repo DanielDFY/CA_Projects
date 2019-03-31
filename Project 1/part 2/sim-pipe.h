@@ -1,13 +1,5 @@
 #include "machine.h"
 
-/* define ALUOps */
-#define ALU_NOP 0
-#define ALU_ADD 1
-#define ALU_SUB 2
-#define ALU_AND 3
-#define ALU_SLL 4
-#define ALU_SLT 5
-
 /* define values related to operands, all possible combinations are included */
 typedef struct{
   int in1;			        /* input 1 register number */
@@ -17,6 +9,15 @@ typedef struct{
   int out2;			        /* output 2 register number */
 }oprand_t;
 
+/* define ALUOps */
+typedef enum {
+  ALU_NOP = 0,
+  ALU_ADD,
+  ALU_SUB,
+  ALU_AND,
+  ALU_SLT,
+  ALU_SLL
+} alu_func_t;
 
 /*define buffer between fetch and decode stage*/
 struct ifid_buf {
@@ -37,7 +38,8 @@ struct idex_buf {
   int busA;             /* read data 1 */
   int busB;             /* read data 2 */
   int wr;               /* write register */
-  int dst;              /* used for check hazard */
+  int dstR;             /* used for check hazard */
+  int dstM;             /* used for check hazard */
   int rwflag;           /* read/write flag */
   int target;           /* jump target */
 };
@@ -48,7 +50,8 @@ struct exmem_buf{
   md_addr_t PC;         /* pc value of current instruction */
   int alu;              /* alu result */
   int wr;               /* write register */
-  int dst;              /* used for check hazard */
+  int dstR;             /* used for check hazard */
+  int dstM;             /* used for check hazard */
   int rwflag;           /* read/write flag */
   int target;           /* jump target */
 };
@@ -58,9 +61,10 @@ struct memwb_buf{
   md_inst_t inst;		    /* instruction in MEM stage */
   md_addr_t PC;         /* pc value of current instruction */
   int wr;               /* write register */
+  int alu;              /* alu result */
   int memLoad;          /* value read from memory */
-  int dst;              /* used for check hazard */
-  int fromMem;         /* if read from memory */
+  int dstR;             /* used for check hazard */
+  int dstM;             /* used for check hazard */
 };
 
 /*used for trace printing*/
