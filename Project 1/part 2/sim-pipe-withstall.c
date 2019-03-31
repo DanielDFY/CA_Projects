@@ -111,18 +111,16 @@ sim_init(void)
   de.func = 0;
   de.busA = DNA;
   de.busB = DNA;
-  de.wr = 0;
+  de.swR = 0;
   de.dstR = DNA;
-  de.dstM = DNA;
   de.rwflag = 0;
   de.target = 0;
   /* EX/MEM */
   em.inst.a = NOP;
   em.PC = 0;
   em.alu = 0;
-  em.wr = 0;
+  em.swR = 0;
   em.dstR = DNA;
-  em.dstM = DNA;
   em.rwflag = 0;
   em.target = 0;
   /* MEM/WB */
@@ -130,7 +128,7 @@ sim_init(void)
   mw.PC = 0;
   mw.memLoad = 0;
   mw.dstR = DNA;
-  mw.dstM = DNA;
+  mw.rwflag = 0;
   /* WB */
   wb.inst.a = NOP;
   wb.PC = 0;
@@ -381,25 +379,23 @@ READ_OPRAND_VALUE:
   } else {
     de.busB = de.oprand.in2 != DNA ? GPR(de.oprand.in2):0; 
   }
-  /* record write-in register if F_STORE, set write flag */
+  /* if F_STORE, record write-in register, set write flag */
   if (de.iflags & F_STORE) {
-    de.wr = GPR(de.oprand.in1);
+    de.swR = GPR(de.oprand.in1);
     de.rwflag |= 2;
   } else {
     de.rwflag &= ~2;
   }
-  /* record dst */
-  if (de.oprand.out1 >= 0) {
-    ctl.dst ^= 1 << de.oprand.out1;
+  /* record write-in register */
+  de.dstR = de.oprand.out1;
+  /* record for hazard checking*/
+  if (de.dstR >= 0) {
+    ctl.dst ^= 1 << de.dstR;
   }
-  /* set read flag */
+  /* set read/write flag */
   if (de.iflags & F_LOAD) {
-    de.dstM = de.oprand.out1;
-    de.dstR = DNA;
     de.rwflag |= 4;
   } else {
-    de.dstR = de.oprand.out1;
-    de.dstM = DNA;
     de.rwflag &= ~4;
   }
 }
@@ -408,9 +404,8 @@ void do_ex()
 {
   em.inst = de.inst;
   em.PC = de.PC;
-  em.wr = de.wr;
+  em.swR = de.swR;
   em.dstR = de.dstR;
-  em.dstM = de.dstM;
   em.rwflag = de.rwflag;
   em.target = de.target;
   switch (de.func) {
@@ -449,10 +444,10 @@ void do_mem()
   mw.PC = em.PC;
   mw.alu = em.alu;
   mw.dstR = em.dstR;
-  mw.dstM = em.dstM;
-  if (em.rwflag & 2) {
-    WRITE_WORD(em.wr, mw.alu, _fault);
-  } else if (em.rwflag & 4) {
+  mw.rwflag = em.rwflag;
+  if (mw.rwflag & 2) {
+    WRITE_WORD(em.swR, mw.alu, _fault);
+  } else if (mw.rwflag & 4) {
     mw.memLoad = READ_WORD(mw.alu, _fault);
   }
 }                                                                                        
@@ -461,13 +456,11 @@ void do_wb()
 {
 	wb.inst = mw.inst;
   wb.PC = mw.PC;
-  if (mw.dstR != DNA) {
-    ctl.dst ^= 1 << mw.dstR;
+  ctl.dst ^= 1 << mw.dstR;
+  if (mw.rwflag & 4) {
+    SET_GPR(mw.dstR, mw.memLoad);
+  } else {
     SET_GPR(mw.dstR, mw.alu);
-  }
-  if (mw.dstM != DNA) {
-    ctl.dst ^= 1 << mw.dstM;
-    SET_GPR(mw.dstM, mw.memLoad);
   }
   if(wb.inst.a == SYSCALL){
     SYSCALL(wb.inst);

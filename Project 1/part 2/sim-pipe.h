@@ -37,9 +37,8 @@ struct idex_buf {
   int func;             /* alu func code */
   int busA;             /* read data 1 */
   int busB;             /* read data 2 */
-  int wr;               /* write register */
-  int dstR;             /* used for check hazard */
-  int dstM;             /* used for check hazard */
+  int swR;              /* store word address register */
+  int dstR;             /* write-in register */
   int rwflag;           /* read/write flag */
   int target;           /* jump target */
 };
@@ -49,9 +48,8 @@ struct exmem_buf{
   md_inst_t inst;		    /* instruction in EX stage */
   md_addr_t PC;         /* pc value of current instruction */
   int alu;              /* alu result */
-  int wr;               /* write register */
-  int dstR;             /* used for check hazard */
-  int dstM;             /* used for check hazard */
+  int swR;              /* store word address register */
+  int dstR;             /* write-in register */
   int rwflag;           /* read/write flag */
   int target;           /* jump target */
 };
@@ -60,11 +58,11 @@ struct exmem_buf{
 struct memwb_buf{
   md_inst_t inst;		    /* instruction in MEM stage */
   md_addr_t PC;         /* pc value of current instruction */
-  int wr;               /* write register */
   int alu;              /* alu result */
   int memLoad;          /* value read from memory */
-  int dstR;             /* used for check hazard */
-  int dstM;             /* used for check hazard */
+  int swR;              /* store word address register */
+  int dstR;             /* write-in register */
+  int rwflag;           /* read/write flag */
 };
 
 /*used for trace printing*/
