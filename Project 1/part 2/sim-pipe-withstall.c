@@ -133,10 +133,10 @@ sim_init(void)
   wb.inst.a = NOP;
   wb.PC = 0;
   /* CTL */
-  ctl.flag = 0;
+  ctl.ch = 0;
   ctl.cond = 0;
   ctl.dst = 0;
-  ctl.stall = 0;
+  ctl.dh = 0;
 }
 
 /* load program into simulated state */
@@ -269,12 +269,12 @@ sim_main(void)
 void do_pipeline_ctl()
 {
   /* check prediction, insert a NOP to wait for the result */
-	if (ctl.flag) {
+	if (ctl.ch) {
     fd.PC = de.PC;
     fd.inst.a = NOP;
   }
-  /* repeatedly decode the same instruction while keep increasing NPC, until hazard solved */
-  if (ctl.stall) {
+  /* repeatedly decode the same instruction while keep increasing NPC, until hazard disappears */
+  if (ctl.dh) {
     fd.PC = de.PC;
     fd.inst = de.inst;
     de.inst.a = NOP;
@@ -293,7 +293,7 @@ void do_if()
       fd.NPC = de.target;
     }
     /* reset */
-    ctl.flag = FALSE;
+    ctl.ch = FALSE;
     ctl.cond = 0;
   } else {
     fd.NPC = fd.PC + sizeof(md_inst_t);
@@ -328,10 +328,10 @@ void do_id()
 READ_OPRAND_VALUE:
   /* check for stall */    
   if((de.oprand.in1 >= 0 && (ctl.dst & 1 << de.oprand.in1)) || (de.oprand.in2 >= 0 && (ctl.dst & 1 << de.oprand.in2))) {
-    ctl.stall = TRUE;
+    ctl.dh = TRUE;
     return;
   } else {
-    ctl.stall = FALSE;
+    ctl.dh = FALSE;
   }
     switch (de.opcode) {
       case ADD:
@@ -352,12 +352,12 @@ READ_OPRAND_VALUE:
         de.func = ALU_SLT;
         break;
       case JUMP:
-        ctl.flag = TRUE;
+        ctl.ch = TRUE;
         ctl.cond |= 1;
         de.target = (fd.PC & 0xf0000000) | ((de.inst.b & 0x3ffffff) << 2);
         break;
       case BNE:
-        ctl.flag = TRUE;
+        ctl.ch = TRUE;
         de.func = ALU_SUB;
         de.target = fd.PC + 8 + ((de.inst.b & 0xffff) << 2);
         break;
@@ -428,11 +428,11 @@ void do_ex()
       em.alu = 0;
       break;
   }
-  if (ctl.flag) {
+  if (ctl.ch) {
     if (em.alu) {
       ctl.cond |= 2;
     } else {
-      ctl.flag = FALSE;
+      ctl.ch = FALSE;
     }
   }
 }
@@ -446,8 +446,10 @@ void do_mem()
   mw.dstR = em.dstR;
   mw.rwflag = em.rwflag;
   if (mw.rwflag & 2) {
+    /* store */
     WRITE_WORD(em.swR, mw.alu, _fault);
   } else if (mw.rwflag & 4) {
+    /* load */
     mw.memLoad = READ_WORD(mw.alu, _fault);
   }
 }                                                                                        
@@ -456,6 +458,7 @@ void do_wb()
 {
 	wb.inst = mw.inst;
   wb.PC = mw.PC;
+  /* record the destination register for hazard checking */
   ctl.dst ^= 1 << mw.dstR;
   if (mw.rwflag & 4) {
     SET_GPR(mw.dstR, mw.memLoad);

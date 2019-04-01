@@ -9,7 +9,7 @@ typedef struct{
   int out2;			        /* output 2 register number */
 }oprand_t;
 
-/* define ALUOps */
+/* define ALU func value */
 typedef enum {
   ALU_NOP = 0,
   ALU_ADD,
@@ -37,7 +37,7 @@ struct idex_buf {
   int func;             /* alu func code */
   int busA;             /* read data 1 */
   int busB;             /* read data 2 */
-  int swR;              /* store word address register */
+  int swR;              /* store mem address register */
   int dstR;             /* write-in register */
   int rwflag;           /* read/write flag */
   int target;           /* jump target */
@@ -73,10 +73,10 @@ struct wb_buf{
 
 /*define buffer for pipline control*/
 struct control_buf {
-  int flag;             /* check predict */
+  int ch;               /* check control hazard */
   int cond;             /* check branch */
   int dst;              /* store write-in dst of the last cycle */
-  int stall;           /* check stall */
+  int dh;               /* check data hazard */
 };
 
 /*do fetch stage*/
