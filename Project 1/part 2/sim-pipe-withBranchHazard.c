@@ -109,10 +109,13 @@ sim_init(void)
   de.PC = 0;
   de.iflags = 0;
   de.func = 0;
-  de.busA = DNA;
-  de.busB = DNA;
+  de.srcA = 0;
+  de.srcB = 0;
+  de.busA = 0;
+  de.busB = 0;
   de.sw = 0;
   de.dstR = DNA;
+  de.dstM = DNA;
   de.rwflag = 0;
   de.target = 0;
   /* EX/MEM */
@@ -121,6 +124,7 @@ sim_init(void)
   em.alu = 0;
   em.sw = 0;
   em.dstR = DNA;
+  de.dstM = DNA;
   em.rwflag = 0;
   em.target = 0;
   /* MEM/WB */
@@ -128,6 +132,7 @@ sim_init(void)
   mw.PC = 0;
   mw.memLoad = 0;
   mw.dstR = DNA;
+  de.dstM = DNA;
   mw.rwflag = 0;
   /* WB */
   wb.inst.a = NOP;
@@ -260,21 +265,51 @@ sim_main(void)
     do_mem();
     do_ex();
     do_id();
+    do_forward();
     do_if();
     /* print current trace */
     do_log();
   }
 }
 
-void do_pipeline_ctl()
-{
-  /* check prediction, insert a NOP to wait for the result */
-	if (ctl.ch) {
-    fd.PC = de.PC;
-    fd.inst.a = NOP;
+void forward(int *val, int *src) {
+  if(*src != DNA) {
+    if(*src == em.dstR) {
+      *val = em.alu;
+    } else if(*src == mw.dstR) {
+      *val = mw.alu;      
+    } else if(*src == mw.dstM) {
+      *val = mw.memLoad;      
+    } else if(*src == wb.dstR) {
+      *val = wb.alu;            
+    } else if(*src == wb.dstM) {
+      *val = wb.memLoad;      
+    } else {
+      *val = GPR(*src);      
+    }
+  } else {
+    *val = 0;
   }
-  /* repeatedly decode the same instruction while keep increasing NPC, until hazard disappears */
-  if (ctl.dh) {
+}
+
+void do_forward() {
+  forward(&de.busA, &de.srcA);
+  forward(&de.busB, &de.srcB);
+  forward(&de.sw, &de.oprand.in1);
+}
+
+/* since load-use hazard can't be forwarding*/
+void do_pipeline_ctl() {
+  if(ctl.cond) {
+    /* predict wrong */    
+    if(ctl.ch&2){
+      de.inst.a = NOP;
+    }
+    ctl.ch = FALSE;
+    ctl.cond = FALSE;
+  }
+  /* insert NOP for load hazard */
+  if(ctl.dh) {
     fd.PC = de.PC;
     fd.inst = de.inst;
     de.inst.a = NOP;
@@ -283,18 +318,10 @@ void do_pipeline_ctl()
 
 void do_if()
 {
-  if (ctl.cond) {
-    /* if branch */ 
-    if (ctl.cond & 2){
-      /* address from memory value */
-      fd.NPC = em.target;
-    } else {
-      /* address from register */
-      fd.NPC = de.target;
-    }
-    /* reset */
-    ctl.ch = FALSE;
-    ctl.cond = 0;
+  if(ctl.cond&2) {
+    fd.NPC = em.target;
+  } else if(ctl.cond&1) {
+    fd.NPC = de.target;
   } else {
     fd.NPC = fd.PC + sizeof(md_inst_t);
   }
@@ -303,15 +330,13 @@ void do_if()
   MD_FETCH_INSTI(fd.inst, mem, fd.PC);
 }
 
-void do_id()
-{
-  /* if inst is nop, simply return */
-  de.inst = fd.inst;
-  de.PC = fd.PC;
-  de.target = 0;
-  if(NOP == de.inst.a) return;
-  MD_SET_OPCODE(de.opcode, de.inst);
-  md_inst_t inst = de.inst;
+void do_id() {
+    de.inst = fd.inst;
+    de.PC = fd.PC;
+    de.rwflag= 0;
+    if(NOP == de.inst.a) return;
+    MD_SET_OPCODE(de.opcode, de.inst);
+    md_inst_t inst = de.inst;
 #define DEFINST(OP,MSK,NAME,OPFORM,RES,FLAGS,O1,O2,I1,I2,I3)\
   if (OP==de.opcode){\
     de.iflags = FLAGS;\
@@ -327,13 +352,14 @@ void do_id()
 #include "machine.def"
 READ_OPRAND_VALUE:
   /* check for stall */    
-  if((de.oprand.in1 >= 0 && (ctl.dst & 1 << de.oprand.in1)) || (de.oprand.in2 >= 0 && (ctl.dst & 1 << de.oprand.in2))) {
+  if((de.oprand.in1 >= 0 && (ctl.dst&1<<de.oprand.in1)) || (de.oprand.in2 >= 0 && (ctl.dst&1<<de.oprand.in2))) {
     ctl.dh = TRUE;
     return;
   } else {
     ctl.dh = FALSE;
   }
-    switch (de.opcode) {
+  
+  switch (de.opcode) {
       case ADD:
       case ADDU:
       case ADDIU:
@@ -365,64 +391,65 @@ READ_OPRAND_VALUE:
         de.func = ALU_NOP;
         break;
   }
-  /* read data 1 */
-  if (de.iflags & F_DISP) {
-    de.busA = de.oprand.in2 != DNA ? GPR(de.oprand.in2) : 0;
+  /* src A*/
+  if(de.iflags & F_DISP) {
+    de.srcA = de.oprand.in2; 
   } else {
-    de.busA = de.oprand.in1 != DNA ? GPR(de.oprand.in1) : 0;
+    de.srcA = de.oprand.in1; 
   }
-  /* read data 2 */
-  if (de.iflags & F_IMM || de.iflags & F_DISP) {
-    de.busB = (int)(short)(de.inst.b & 0xffff);
-  } else if (de.func == ALU_SLL) {
-    de.busB = de.inst.b & 0xff;
-  } else {
-    de.busB = de.oprand.in2 != DNA ? GPR(de.oprand.in2):0; 
+  /* src B */
+  de.srcB = de.oprand.in2; 
+  /* load */
+  if(de.iflags&F_STORE) {
+    de.rwflag |= 2;    
   }
-  /* if F_STORE, record write-in register, set write flag */
-  if (de.iflags & F_STORE) {
-    de.sw = GPR(de.oprand.in1);
-    de.rwflag |= 2;
-  } else {
-    de.rwflag &= ~2;
-  }
-  /* record write-in register */
-  de.dstR = de.oprand.out1;
-  /* record for hazard checking*/
-  if (de.dstR >= 0) {
-    ctl.dst ^= 1 << de.dstR;
-  }
-  /* set read/write flag */
-  if (de.iflags & F_LOAD) {
+  /* dst/read */ 
+  if(de.iflags&F_LOAD) {
     de.rwflag |= 4;
+    de.dstM = de.oprand.out1;
+    de.dstR = DNA;
+    ctl.dst |= 1 << de.dstM;
   } else {
-    de.rwflag &= ~4;
+    de.dstR = de.oprand.out1;
+    de.dstM = DNA;
   }
 }
 
-void do_ex()
-{
+void do_ex() {
   em.inst = de.inst;
   em.PC = de.PC;
-  em.sw = de.sw;
   em.dstR = de.dstR;
+  em.dstM = de.dstM;  
+  em.sw = de.sw;
   em.rwflag = de.rwflag;
   em.target = de.target;
-  switch (de.func) {
+  /* alu A */
+  int aluA = de.busA;
+  /* alu B */  
+  int aluB;
+  if(de.iflags&F_IMM || de.iflags&F_DISP) {
+    aluB = (int)(short)(em.inst.b & 0xffff);
+  } else if(de.func == ALU_SLL) {
+    aluB = em.inst.b & 0xff;
+  } else {
+    aluB = de.busB; 
+  }
+  /* alu part */
+  switch(de.func) {
     case ALU_ADD:
-      em.alu = de.busA + de.busB;
+      em.alu = aluA + aluB;
       break;
     case ALU_SUB:
-      em.alu = de.busA - de.busB;
+      em.alu = aluA - aluB;
       break;
     case ALU_AND:
-      em.alu = de.busA & de.busB;
-      break;
-    case ALU_SLL:
-      em.alu = de.busA << de.busB;
+      em.alu = aluA & aluB;
       break;
     case ALU_SLT:
-      em.alu = de.busA < de.busB;
+      em.alu = aluA < aluB;      
+      break;
+    case ALU_SLL:
+      em.alu = aluA << aluB;
       break;
     default:
       em.alu = 0;
@@ -437,13 +464,14 @@ void do_ex()
   }
 }
 
-void do_mem()
-{
+void do_mem() {
   enum md_fault_type _fault;
+  
   mw.inst = em.inst;
-  mw.PC = em.PC;
-  mw.alu = em.alu;
   mw.dstR = em.dstR;
+  mw.dstM = em.dstM;
+  mw.alu = em.alu;
+  mw.PC = em.PC;
   mw.rwflag = em.rwflag;
   if (mw.rwflag & 2) {
     /* store */
@@ -451,18 +479,21 @@ void do_mem()
   } else if (mw.rwflag & 4) {
     /* load */
     mw.memLoad = READ_WORD(mw.alu, _fault);
+    ctl.dst &= ~(1 << mw.dstM);
   }
-}                                                                                        
+}                                                                         
 
-void do_wb()
-{
-	wb.inst = mw.inst;
+void do_wb() {
+  wb.inst = mw.inst;
   wb.PC = mw.PC;
-  /* record the destination register for hazard checking */
-  ctl.dst ^= 1 << mw.dstR;
-  if (mw.rwflag & 4) {
-    SET_GPR(mw.dstR, mw.memLoad);
-  } else {
+  wb.dstR = mw.dstR;
+  wb.dstM = mw.dstM;
+  wb.alu = mw.alu;
+  wb.memLoad = mw.memLoad;
+  if(mw.dstM != DNA) {
+    SET_GPR(mw.dstM, mw.memLoad);
+  }
+  if(mw.dstR != DNA) {
     SET_GPR(mw.dstR, mw.alu);
   }
   if(wb.inst.a == SYSCALL){

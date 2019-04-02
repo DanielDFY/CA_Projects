@@ -34,11 +34,14 @@ struct idex_buf {
   int opcode;           /* operation number */
   oprand_t oprand;      /* operand */
   int iflags;           /* instruction flags */
+  int srcA;             /* data 1 register, used for forwarding */
+  int srcB;             /* data 2 register, used for forwarding */
   int func;             /* alu func code */
   int busA;             /* read data 1 */
   int busB;             /* read data 2 */
-  int swR;              /* store mem address register */
+  int sw;               /* store mem address */
   int dstR;             /* write-in register */
+  int dstM;             /* mem-write-in register */
   int rwflag;           /* read/write flag */
   int target;           /* jump target */
 };
@@ -48,8 +51,9 @@ struct exmem_buf{
   md_inst_t inst;		    /* instruction in EX stage */
   md_addr_t PC;         /* pc value of current instruction */
   int alu;              /* alu result */
-  int swR;              /* store word address register */
+  int sw;               /* store word address */
   int dstR;             /* write-in register */
+  int dstM;             /* mem-write-in register */
   int rwflag;           /* read/write flag */
   int target;           /* jump target */
 };
@@ -60,8 +64,9 @@ struct memwb_buf{
   md_addr_t PC;         /* pc value of current instruction */
   int alu;              /* alu result */
   int memLoad;          /* value read from memory */
-  int swR;              /* store word address register */
+  int sw;               /* store word address */
   int dstR;             /* write-in register */
+  int dstM;             /* mem-write-in register */
   int rwflag;           /* read/write flag */
 };
 
@@ -69,6 +74,10 @@ struct memwb_buf{
 struct wb_buf{
   md_inst_t inst;       /* instruction in WB stage */
   md_addr_t PC;         /* pc value of current instruction */
+  int alu;              /* alu result */
+  int memLoad;          /* value read from memory */
+  int dstR;             /* write-in register */
+  int dstM;             /* mem-write-in register */
 };  
 
 /*define buffer for pipline control*/
