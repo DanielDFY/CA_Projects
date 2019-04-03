@@ -6,7 +6,7 @@ At this part, two versions of pipeline cpu will be designed: `with-stall` and `d
 
 ## Instruction list
 
-According to `loop.s` and `mechine.def` , all the instructions we need to implement are as follows:
+All the instructions we need to implement are as follows:
 
 | Instruction | OP Code | ALUSrcA | ALUSrcB |  ALUOp  | Dst  |  Branch   |
 | :---------: | :-----: | :-----: | :-----: | :-----: | :--: | :-------: |
