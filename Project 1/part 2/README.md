@@ -48,9 +48,9 @@ In `sim-pipe.h` , the structures we use are defined as follows:
 
 ```c
 struct ifid_buf {
-  md_inst_t inst;	      /* instruction that has been fetched */
-  md_addr_t PC;	        /* pc value of current instruction */
-  md_addr_t NPC;		    /* the next instruction to fetch */
+  md_inst_t inst;	 /* instruction that has been fetched */
+  md_addr_t PC;	         /* pc value of current instruction */
+  md_addr_t NPC;	 /* the next instruction to fetch */
 };
 ```
 
@@ -60,7 +60,7 @@ struct ifid_buf {
 
 ```c
 struct idex_buf {
-  md_inst_t inst;		    /* instruction in ID stage */ 
+  md_inst_t inst;	/* instruction in ID stage */ 
   md_addr_t PC;         /* pc value of current instruction */
   int opcode;           /* operation number */
   oprand_t oprand;      /* operand */
@@ -84,7 +84,7 @@ struct idex_buf {
 
 ```c
 struct exmem_buf{
-  md_inst_t inst;		    /* instruction in EX stage */
+  md_inst_t inst;	/* instruction in EX stage */
   md_addr_t PC;         /* pc value of current instruction */
   int alu;              /* alu result */
   int sw;               /* store word address */
@@ -101,7 +101,7 @@ struct exmem_buf{
 
 ```c
 struct memwb_buf{
-  md_inst_t inst;		    /* instruction in MEM stage */
+  md_inst_t inst;	/* instruction in MEM stage */
   md_addr_t PC;         /* pc value of current instruction */
   int alu;              /* alu result */
   int memLoad;          /* value read from memory */
@@ -148,7 +148,7 @@ We start from the pipeline without oprand forwarding. In each cycle, the simulat
 while (TRUE)
   {
     ++sim_num_insn;
-	  do_pipeline_ctl();
+    do_pipeline_ctl();
     do_wb();
     do_mem();
     do_ex();
