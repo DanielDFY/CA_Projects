@@ -265,7 +265,6 @@ sim_main(void)
     do_mem();
     do_ex();
     do_id();
-    do_forward();
     do_if();
     /* print current trace */
     do_log();
@@ -276,14 +275,8 @@ void forward(int *val, int *src) {
   if(*src != DNA) {
     if(*src == em.dstR) {
       *val = em.alu;
-    } else if(*src == mw.dstR) {
-      *val = mw.alu;      
     } else if(*src == mw.dstM) {
       *val = mw.memLoad;      
-    } else if(*src == wb.dstR) {
-      *val = wb.alu;            
-    } else if(*src == wb.dstM) {
-      *val = wb.memLoad;      
     } else {
       *val = GPR(*src);      
     }
@@ -350,6 +343,9 @@ READ_OPRAND_VALUE:
     ctl.dh = FALSE;
   }
   
+  int oprA = GPR(de.oprand.in1);
+  int oprB = GPR(de.oprand.in2);
+  
   switch (de.opcode) {
       case ADD:
       case ADDU:
@@ -374,10 +370,13 @@ READ_OPRAND_VALUE:
         de.func = ALU_NOP;
         break;
       case BNE:
-        if(em.dstR != DNA) {
-          SET_GPR(em.dstR, em.alu);
+        if (em.dstR != DNA) {
+          if (em.dstR == de.oprand.in1)
+            oprA = em.alu;
+          else if (em.dstR == de.oprand.in2)
+            oprB = em.alu;
         }
-        if(GPR(de.oprand.in1) != GPR(de.oprand.in2)) {
+        if(oprA ^ oprB) {
           ctl.ch = TRUE;
           de.target = fd.PC + 8 + ((de.inst.b & 0xffff) << 2);
         }
@@ -411,6 +410,7 @@ READ_OPRAND_VALUE:
     de.dstR = de.oprand.out1;
     de.dstM = DNA;
   }
+  do_forward();
 }
 
 void do_ex() {
