@@ -247,6 +247,6 @@ The pipeline will do forwarding at the end of decoding stage.
 
 For control hazard, we can add a "ALU unit" into the decoding stage so that the result can be forward to itself. 
 
-####Design block diagram (forwarding)
+#### Design block diagram (forwarding)
 
 <img alt="design block diagram with stall" src="sim-pipe.png">
