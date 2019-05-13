@@ -395,11 +395,11 @@ READ_OPRAND_VALUE:
   /* src B */
   de.srcB = de.oprand.in2;
   
-  /* load */
+  /* store */
   if(de.iflags&F_STORE) {
     de.rwflag |= 2;    
   }
-  /* dst/read */ 
+  /* dst/load */ 
   if(de.iflags&F_LOAD) {
     de.rwflag |= 4;
     de.dstM = de.oprand.out1;
