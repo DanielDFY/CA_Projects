@@ -1,0 +1,6 @@
+Total number of clock cycles: 19117799
+Total number of memory access: 11059872
+Total number of cache hits: 10720730
+Total number of cache misses: 339142
+Total number of cache line replacements: 339078
+Total number of cache line write backs: 20214
