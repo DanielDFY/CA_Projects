@@ -1,3 +1,3 @@
-# CA_Projects
+# CPUSimulator
 
 Computer Architecture projects based on Simplescalar simulator.
